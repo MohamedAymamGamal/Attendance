@@ -1,5 +1,6 @@
 ﻿using Job.Data;
 using Job.DTO;
+using Job.Extension;
 using Job.Helper;
 using Job.Models;
 using Microsoft.EntityFrameworkCore;
@@ -73,6 +74,7 @@ namespace Job.Reposities
         //get filtered 
         public async Task<List<Attendance>> GetFilteredAsync(Params param)
         {
+         
             var query = _context.Attendances
                 .Include(a => a.User)
                 .AsQueryable();
@@ -89,6 +91,8 @@ namespace Job.Reposities
             if (!string.IsNullOrWhiteSpace(param.department))
                 query = query.Where(a => a.User!.Department == param.department);
 
+            var page = query.Paginate(new PaginationParams());
+            
             return await query
                 .OrderByDescending(a => a.Date)
                 .ThenBy(a => a.User!.UserName)
@@ -119,4 +123,17 @@ namespace Job.Reposities
             return true;
 
         }
-}}
+
+        // One query for ALL admin settings instead of querying per user
+        public async Task<Dictionary<string, WorkSettings>> GetAllSettingsAsync()
+            => await _context.workSettings
+                .ToDictionaryAsync(s => s.AdminId, s => s);
+
+        // Single SaveChanges for the whole batch instead of N updates
+        public async Task BulkUpdateAsync(List<Attendance> records)
+        {
+            _context.Attendances.UpdateRange(records);
+            await _context.SaveChangesAsync();
+        }
+    }
+}
